@@ -1,0 +1,99 @@
+@if (currentUser(); as user) {
+  <div class="flex min-h-screen bg-[#f4f6f9]">
+    <aside class="fixed inset-y-0 left-0 z-10 flex flex-col w-20 md:w-[258px] px-2.5 md:px-4 pt-5 pb-4 border-r border-[#dce3ec] bg-white">
+      <a class="flex items-center justify-center md:justify-start gap-3 px-1 pb-5 mb-2 border-b border-[#edf1f5] text-inherit no-underline" routerLink="/dashboard" aria-label="SRM home">
+        <span class="grid place-items-center w-9 h-9 rounded-lg bg-[#142e4c] text-white text-lg font-extrabold shrink-0">S</span>
+        <span class="hidden md:flex flex-col gap-0.5">
+          <strong class="text-sm text-[#142238] leading-none tracking-tight">SRM Enterprise</strong>
+          <small class="text-[10px] font-semibold text-[#64748b]">Supplier Relationship Mgmt</small>
+        </span>
+      </a>
+
+      <div class="flex-1 overflow-y-auto grid gap-4 content-start py-2">
+        @for (section of navSections(); track section.title) {
+          <div>
+            <div class="hidden md:block px-2.5 pb-1.5 text-[10px] font-extrabold tracking-[0.14em] text-[#94a3b8]">
+              {{ section.title }}
+            </div>
+            <nav class="grid gap-0.5" [attr.aria-label]="section.title">
+              @for (item of section.items; track item.path) {
+                <a
+                  class="flex items-center justify-center md:justify-start gap-3 px-2 md:px-3 py-2 rounded-lg text-[13px] font-semibold text-[#475569] no-underline hover:bg-[#f1f5f9] hover:text-[#142238] transition-colors"
+                  [routerLink]="item.path"
+                  [queryParams]="item.queryParams ?? null"
+                  routerLinkActive="!bg-[#e8eff7] !text-[#142e4c] !font-bold"
+                  [routerLinkActiveOptions]="{ exact: true }"
+                >
+                  <mat-icon class="!text-[19px] !w-[19px] !h-[19px]" aria-hidden="true">{{ item.icon }}</mat-icon>
+                  <span class="hidden md:inline">{{ item.label }}</span>
+                </a>
+              }
+            </nav>
+          </div>
+        }
+      </div>
+
+      <div class="hidden md:block pt-3 px-2 border-t border-[#edf1f5] text-[10px] text-[#64748b]">
+        <div class="font-bold text-[#334155]">{{ isSupplierOnly() ? 'Supplier Self-Service Portal' : 'SAP Companion Suite' }}</div>
+        <div class="mt-0.5">RBAC Enforced · {{ user.roles[0] }}</div>
+      </div>
+    </aside>
+
+    <main class="w-[calc(100%-5rem)] md:w-[calc(100%-258px)] ml-20 md:ml-[258px] min-h-screen flex flex-col">
+      <header class="flex min-h-[64px] items-center justify-between gap-4 px-5 md:px-8 py-2.5 border-b border-[#dce3ec] bg-white">
+        <div class="flex items-center gap-3">
+          <div>
+            <span class="block text-[9px] font-extrabold tracking-[0.15em] text-[#64748b]">
+              {{ isSupplierOnly() ? 'SUPPLIER PORTAL' : 'ENTERPRISE PROCUREMENT' }}
+            </span>
+            <div class="mt-0.5 text-xs font-bold text-[#1e293b]">Supplier Relationship Management Console</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2.5">
+          @if (canAccessUsers()) {
+            <a
+              routerLink="/users"
+              class="hidden lg:inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-[#dce4ec] bg-[#f8fafc] text-[11px] font-bold text-[#334155] no-underline hover:bg-[#eef3f8]"
+            >
+              <mat-icon class="!text-sm !w-4 !h-4">manage_accounts</mat-icon>
+              <span>{{ isSupplierOnly() ? 'Colleagues' : 'Users' }}</span>
+            </a>
+          }
+          <a
+            routerLink="/reports"
+            [queryParams]="{ tab: 'NOTIFICATIONS' }"
+            class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-[#dce4ec] bg-[#f8fafc] text-[11px] font-bold text-[#334155] no-underline hover:bg-[#eef3f8]"
+            aria-label="Notifications"
+          >
+            <mat-icon class="!text-sm !w-4 !h-4">notifications</mat-icon>
+            <span class="hidden sm:inline">Alerts</span>
+          </a>
+          <div class="hidden sm:grid gap-0.5 text-right pl-2 border-l border-[#e2e8f0]">
+            <span class="text-xs font-bold text-[#1e293b]">{{ user.fullName }}</span>
+            <span class="text-[10px] font-semibold text-[#64748b]">{{ user.roles.join(' · ') }}</span>
+          </div>
+          <span
+            class="grid place-items-center w-8 h-8 rounded-lg bg-[#e8eff7] text-[#142e4c] text-xs font-extrabold shrink-0"
+            [attr.aria-label]="user.fullName"
+          >
+            {{ userInitial() }}
+          </span>
+          <button
+            type="button"
+            (click)="logout()"
+            class="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-[#dce4ec] bg-white text-[11px] font-bold text-[#334155] hover:bg-[#f4f7fa] hover:text-[#142238] cursor-pointer"
+          >
+            <mat-icon class="!text-sm !w-4 !h-4">logout</mat-icon>
+            <span>Logout</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="max-w-[1440px] w-full mx-auto p-5 md:p-7 flex-1">
+        <router-outlet />
+      </section>
+    </main>
+  </div>
+} @else {
+  <router-outlet />
+}

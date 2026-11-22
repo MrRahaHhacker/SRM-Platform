@@ -1,0 +1,6 @@
+{
+  "name": "SRM Platform",
+  "description": "Cloud-based Supplier Relationship Management platform complementing SAP for supplier onboarding, qualification, RFQ sourcing, quotations, evaluation, negotiation, approvals, awards, and audit trail.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
