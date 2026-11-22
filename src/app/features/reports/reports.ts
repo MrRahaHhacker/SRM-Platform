@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { SrmService } from '../../core/services/srm.service';
 import type { AuditEvent, NotificationItem } from '../../core/services/srm.models';
+import { ConfirmDialogService } from '../../core/ui/confirm-dialog.service';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -203,7 +204,7 @@ import type { AuditEvent, NotificationItem } from '../../core/services/srm.model
                 @if (n.deliveryStatus === 'FAILED' && canRetryNotifications()) {
                   <button
                     type="button"
-                    (click)="retryNotification(n.notificationId)"
+                    (click)="retryNotification(n)"
                     class="h-8 px-3 rounded-lg bg-[#183b5d] text-white text-[11px] font-bold cursor-pointer"
                   >
                     Retry Delivery
@@ -222,6 +223,7 @@ export class ReportsComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly activeTab = signal<'AUDIT' | 'NOTIFICATIONS'>('AUDIT');
   protected readonly auditEvents = signal<AuditEvent[]>([]);
@@ -282,8 +284,18 @@ export class ReportsComponent implements OnInit {
     });
   }
 
-  protected exportCsv(): void {
+  protected async exportCsv(): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
+    const ok = await this.confirmDialog.confirm({
+      title: 'Export Audit Trail CSV',
+      message: `Export ${this.auditEvents().length} audit record(s) to CSV? This export action is itself logged in the audit trail.`,
+      confirmLabel: 'Export CSV',
+      cancelLabel: 'Cancel',
+      tone: 'primary',
+      icon: 'download',
+    });
+    if (!ok) return;
+
     this.srm.logAuditExport().subscribe({ error: () => undefined });
     const rows = [
       ['Timestamp', 'Actor', 'ActorType', 'Action', 'EntityType', 'Outcome', 'Reason'],
@@ -315,8 +327,18 @@ export class ReportsComponent implements OnInit {
     });
   }
 
-  protected retryNotification(id: string): void {
-    this.srm.retryNotification(id).subscribe({
+  protected async retryNotification(n: NotificationItem): Promise<void> {
+    const ok = await this.confirmDialog.confirm({
+      title: 'Retry Notification Delivery',
+      message: `Re-dispatch "${n.title}" to ${n.recipientEmail}?`,
+      confirmLabel: 'Retry Delivery',
+      cancelLabel: 'Cancel',
+      tone: 'primary',
+      icon: 'send',
+    });
+    if (!ok) return;
+
+    this.srm.retryNotification(n.notificationId).subscribe({
       next: (res) => {
         this.successMessage.set(res.message);
         this.loadNotifications();

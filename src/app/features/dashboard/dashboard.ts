@@ -361,7 +361,7 @@ const ALL_MODULES: DashboardModule[] = [
       </div>
     }
 
-    <section class="p-4 border-l-4 border-[#7da9ce] rounded-r-lg bg-[#f0f5fa]">
+    <section class="p-4 border border-[#dce4ec] rounded-xl bg-[#f0f5fa]">
       <strong class="text-xs font-bold text-[#29435f]">Designed to complement SAP</strong>
       <p class="text-xs text-[#63768b] m-0 mt-1 leading-relaxed">
         SRM owns supplier onboarding, qualification, RFQ sourcing, quotations, evaluation, negotiation, and award approvals. SAP remains the system of record for Vendor Master, Material Master, PR, PO, GRN, Invoice Verification, and MRP.

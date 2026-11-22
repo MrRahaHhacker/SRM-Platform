@@ -3,6 +3,8 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { MatIconModule } from '@angular/material/icon';
 import type { RoleCode } from './core/auth/auth.models';
 import { AuthService } from './core/auth/auth.service';
+import { ConfirmDialogComponent } from './core/ui/confirm-dialog';
+import { ConfirmDialogService } from './core/ui/confirm-dialog.service';
 
 interface NavItem {
   label: string;
@@ -121,13 +123,14 @@ const ALL_NAV_SECTIONS: NavSection[] = [
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-root',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, MatIconModule],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, MatIconModule, ConfirmDialogComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
 export class App {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly currentUser = this.auth.currentUser;
 
@@ -162,7 +165,17 @@ export class App {
     return name ? name.charAt(0).toUpperCase() : 'U';
   });
 
-  protected logout(): void {
+  protected async logout(): Promise<void> {
+    const ok = await this.confirmDialog.confirm({
+      title: 'Confirm Sign Out',
+      message: 'Are you sure you want to sign out of the SRM workspace?',
+      confirmLabel: 'Sign Out',
+      cancelLabel: 'Stay Signed In',
+      tone: 'warning',
+      icon: 'logout',
+    });
+    if (!ok) return;
+
     this.auth.logout();
     void this.router.navigate(['/login']);
   }

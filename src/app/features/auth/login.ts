@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import type { DemoAccountInfo } from '../../core/auth/auth.models';
 import { SupplierService } from '../suppliers/supplier.service';
+import { ConfirmDialogService } from '../../core/ui/confirm-dialog.service';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -209,6 +210,7 @@ export class LoginComponent implements OnInit {
   private readonly supplierService = inject(SupplierService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly registerMode = signal(false);
   protected readonly loading = signal(false);
@@ -274,12 +276,22 @@ export class LoginComponent implements OnInit {
     });
   }
 
-  protected submitRegistration(): void {
+  protected async submitRegistration(): Promise<void> {
     if (this.registerForm.invalid || this.loading()) return;
+    const raw = this.registerForm.getRawValue();
+    const ok = await this.confirmDialog.confirm({
+      title: 'Submit Supplier Registration',
+      message: `Register "${raw.legalName.trim()}" as a new supplier organization in DRAFT onboarding status?`,
+      confirmLabel: 'Submit Registration',
+      cancelLabel: 'Cancel',
+      tone: 'primary',
+      icon: 'how_to_reg',
+    });
+    if (!ok) return;
+
     this.loading.set(true);
     this.errorMessage.set('');
     this.successMessage.set('');
-    const raw = this.registerForm.getRawValue();
     this.supplierService
       .registerSupplier({
         legalName: raw.legalName.trim(),

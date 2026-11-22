@@ -31,6 +31,10 @@ export class SrmService {
     return this.http.get<ApiResponse<Rfq[]>>(`${API}/rfqs`);
   }
 
+  getRfq(rfqId: string): Observable<ApiResponse<Rfq>> {
+    return this.http.get<ApiResponse<Rfq>>(`${API}/rfqs/${rfqId}`);
+  }
+
   createRfq(payload: Record<string, unknown>): Observable<ApiResponse<Rfq>> {
     return this.http.post<ApiResponse<Rfq>>(`${API}/rfqs`, payload);
   }

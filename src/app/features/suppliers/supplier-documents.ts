@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/auth/auth.service';
+import { ConfirmDialogService } from '../../core/ui/confirm-dialog.service';
 import type { SupplierDocument } from './supplier.models';
 import { SupplierService } from './supplier.service';
 
@@ -207,6 +208,7 @@ export class SupplierDocumentsComponent {
 
   private readonly supplierService = inject(SupplierService);
   private readonly auth = inject(AuthService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly platformId = inject(PLATFORM_ID);
 
   protected readonly documentTypes = [
@@ -280,14 +282,24 @@ export class SupplierDocumentsComponent {
     });
   }
 
-  protected upload(): void {
+  protected async upload(): Promise<void> {
     const file = this.selectedFile();
     if (!file || this.uploading()) return;
+
+    const { documentType, expiryDate } = this.uploadForm.getRawValue();
+    const ok = await this.confirmDialog.confirm({
+      title: 'Upload Compliance Document?',
+      message: `Upload "${file.name}" as ${this.labelFor(documentType)} for verification?`,
+      confirmLabel: 'Upload',
+      tone: 'primary',
+      icon: 'upload_file',
+    });
+    if (!ok) return;
+
     this.uploading.set(true);
     this.errorMessage.set('');
     this.successMessage.set('');
 
-    const { documentType, expiryDate } = this.uploadForm.getRawValue();
     this.supplierService.uploadDocument(this.supplierId(), documentType, file, expiryDate).subscribe({
       next: (res) => {
         this.successMessage.set(res.message || 'Document uploaded for verification.');
@@ -327,7 +339,15 @@ export class SupplierDocumentsComponent {
     });
   }
 
-  protected review(fileRecord: SupplierDocument, decision: 'VERIFY' | 'REJECT'): void {
+  protected async review(fileRecord: SupplierDocument, decision: 'VERIFY' | 'REJECT'): Promise<void> {
+    const ok = await this.confirmDialog.confirm({
+      title: decision === 'VERIFY' ? 'Verify Document?' : 'Reject Document?',
+      message: `Mark "${fileRecord.originalFilename}" (${this.labelFor(fileRecord.documentType)}) as ${decision === 'VERIFY' ? 'VERIFIED' : 'REJECTED'}?`,
+      confirmLabel: decision === 'VERIFY' ? 'Verify' : 'Reject',
+      tone: decision === 'VERIFY' ? 'success' : 'danger',
+    });
+    if (!ok) return;
+
     this.reviewingId.set(fileRecord.documentId);
     this.errorMessage.set('');
     this.successMessage.set('');

@@ -1,16 +1,17 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { SrmService } from '../../core/services/srm.service';
-import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.models';
+import type { ApprovalOverview } from '../../core/services/srm.models';
+import { ConfirmDialogService } from '../../core/ui/confirm-dialog.service';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-approvals',
-  imports: [ReactiveFormsModule, DatePipe, DecimalPipe, MatIconModule],
+  imports: [DatePipe, DecimalPipe, RouterLink, MatIconModule],
   template: `
     <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
       <div>
@@ -21,7 +22,7 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
           Approvals, awards & SAP PIR sync
         </h1>
         <p class="text-sm text-[#78889b] m-0">
-          Review buyer recommendations with segregation-of-duties enforcement, issue awards, and sync SAP Purchase Info Records.
+          Open any approval request to review recommendations, issue awards, or synchronize SAP Purchase Info Records.
         </p>
       </div>
       <button
@@ -61,7 +62,7 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
           <div>
             <h2 class="text-base font-bold text-[#18283d] m-0">Procurement Approval Queue</h2>
             <p class="text-xs text-[#78889b] m-0 mt-0.5">
-              Segregation of duties: the buyer who recommended an award cannot approve it.
+              Select a request to open its dedicated approval & award workspace.
             </p>
           </div>
           <span class="px-3 py-1 rounded-full bg-[#f0f4f8] text-[#62758a] text-[10px] font-extrabold">
@@ -72,120 +73,68 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
         @if (data.approvalRequests.length === 0) {
           <p class="text-xs text-[#6f8093] py-6 text-center">No approval requests queued.</p>
         } @else {
-          <div class="grid gap-4">
+          <div class="grid gap-3">
             @for (req of data.approvalRequests; track req.approvalRequestId) {
               @let task = req.tasks[0];
-              <div class="p-4 rounded-xl border border-[#e6ebf1] bg-[#fcfdfe]">
-                <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
-                  <div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="px-2.5 py-0.5 rounded-md bg-[#edf3f8] text-[#183b5d] text-[11px] font-extrabold">
-                        {{ req.recommendation.rfqNumber }}
+              <div class="p-4 rounded-xl border border-[#e6ebf1] bg-[#fcfdfe] flex flex-wrap items-center justify-between gap-4">
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-md bg-[#edf3f8] text-[#183b5d] text-[11px] font-extrabold">
+                      {{ req.recommendation.rfqNumber }}
+                    </span>
+                    <span
+                      class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold"
+                      [class]="
+                        req.status === 'APPROVED'
+                          ? 'bg-[#eaf8f0] text-[#16834e]'
+                          : req.status === 'REJECTED'
+                            ? 'bg-[#fff1f0] text-[#a13d36]'
+                            : 'bg-[#fef7e6] text-[#9a6700]'
+                      "
+                    >
+                      {{ req.status }}
+                    </span>
+                    @if (req.recommendation.isNonL1) {
+                      <span class="px-2.5 py-0.5 rounded-full bg-[#fef7e6] text-[#9a6700] text-[10px] font-extrabold">
+                        NON-L1 EXCEPTION
                       </span>
-                      <span
-                        class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold"
-                        [class]="
-                          req.status === 'APPROVED'
-                            ? 'bg-[#eaf8f0] text-[#16834e]'
-                            : req.status === 'REJECTED'
-                              ? 'bg-[#fff1f0] text-[#a13d36]'
-                              : 'bg-[#fef7e6] text-[#9a6700]'
-                        "
-                      >
-                        {{ req.status }}
+                    }
+                    @if (hasAwardForRfq(req.recommendation.rfqId)) {
+                      <span class="px-2.5 py-0.5 rounded-full bg-[#edf3f8] text-[#183b5d] text-[10px] font-extrabold">
+                        AWARD ISSUED
                       </span>
-                      @if (req.recommendation.isNonL1) {
-                        <span class="px-2.5 py-0.5 rounded-full bg-[#fef7e6] text-[#9a6700] text-[10px] font-extrabold">
-                          NON-L1 EXCEPTION
-                        </span>
-                      }
-                    </div>
-                    <h3 class="text-sm font-bold text-[#18283d] m-0 mt-1.5">
-                      {{ req.recommendation.rfqTitle }} — {{ req.recommendation.supplierName }}
-                    </h3>
-                    <p class="text-xs text-[#6f8093] m-0 mt-0.5">
-                      Recommended by <strong>{{ req.recommendation.recommendedByName }}</strong> ·
-                      Quotation v{{ req.recommendation.versionNumber }} ·
-                      {{ req.createdAt | date:'medium' }}
-                    </p>
+                    }
                   </div>
+                  <h3 class="text-sm font-bold text-[#18283d] m-0 mt-1.5">
+                    {{ req.recommendation.rfqTitle }} — {{ req.recommendation.supplierName }}
+                  </h3>
+                  <p class="text-xs text-[#6f8093] m-0 mt-0.5">
+                    Recommended by <strong>{{ req.recommendation.recommendedByName }}</strong> ·
+                    Quotation v{{ req.recommendation.versionNumber }} ·
+                    {{ req.createdAt | date:'mediumDate' }}
+                    @if (task && task.taskStatus !== 'PENDING') {
+                      · Decision: <strong>{{ task.taskStatus }}</strong>
+                    }
+                  </p>
+                </div>
 
+                <div class="flex flex-wrap items-center gap-4">
                   <div class="text-right">
                     <div class="text-base font-extrabold text-[#183b5d] tabular-nums">
                       {{ req.recommendation.currencyCode }} {{ req.recommendation.recommendedAmount | number:'1.2-2' }}
                     </div>
-                    <div class="text-[11px] text-[#6f8093]">
+                    <div class="text-[11px] text-[#6f8093] tabular-nums">
                       L1 baseline: {{ req.recommendation.l1Amount | number:'1.2-2' }}
-                      @if (req.recommendation.savingsAmount > 0) {
-                        · <span class="text-[#16834e] font-bold">Saved {{ req.recommendation.savingsAmount | number:'1.2-2' }}</span>
-                      }
                     </div>
                   </div>
+                  <a
+                    [routerLink]="['/approvals', req.approvalRequestId]"
+                    class="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[#183b5d] text-white text-xs font-bold no-underline hover:bg-[#122e49] whitespace-nowrap"
+                  >
+                    <mat-icon class="!text-base !w-4 !h-4">open_in_new</mat-icon>
+                    <span>Open Request</span>
+                  </a>
                 </div>
-
-                @if (req.recommendation.justification) {
-                  <div class="p-3 rounded-lg bg-white border border-[#edf1f5] text-xs text-[#30465e] mb-3">
-                    <strong>Commercial Justification:</strong> {{ req.recommendation.justification }}
-                  </div>
-                }
-
-                @if (task && task.taskStatus === 'PENDING' && canApprove()) {
-                  @if (isRecommenderSelf(req)) {
-                    <div class="p-3 rounded-lg bg-[#fef7e6] text-[#9a6700] text-xs font-medium">
-                      Segregation of duties: you submitted this recommendation and cannot approve it.
-                    </div>
-                  } @else {
-                    <div class="pt-3 border-t border-[#edf1f5] flex flex-wrap items-center gap-2">
-                      <input
-                        [formControl]="remarksControl"
-                        placeholder="Approval remarks (required for return or rejection)"
-                        class="flex-1 min-w-[220px] h-9 px-3 border border-[#dfe6ed] rounded-lg bg-white text-xs"
-                      />
-                      <button
-                        type="button"
-                        (click)="decide(req.approvalRequestId, task.approvalTaskId, 'APPROVED')"
-                        [disabled]="busy()"
-                        class="h-9 px-4 rounded-lg bg-[#16834e] text-white text-xs font-bold cursor-pointer"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        (click)="decide(req.approvalRequestId, task.approvalTaskId, 'RETURNED')"
-                        [disabled]="busy() || !remarksControl.value.trim()"
-                        class="h-9 px-3.5 rounded-lg border border-[#dce4ec] bg-white text-xs font-bold text-[#40566d] cursor-pointer disabled:opacity-50"
-                      >
-                        Return
-                      </button>
-                      <button
-                        type="button"
-                        (click)="decide(req.approvalRequestId, task.approvalTaskId, 'REJECTED')"
-                        [disabled]="busy() || !remarksControl.value.trim()"
-                        class="h-9 px-3.5 rounded-lg border border-[#f0d4d1] bg-[#fff7f6] text-xs font-bold text-[#a13d36] cursor-pointer disabled:opacity-50"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  }
-                } @else if (task && task.taskStatus !== 'PENDING') {
-                  <div class="text-xs text-[#52657a] pt-2 border-t border-[#edf1f5] flex flex-wrap items-center justify-between gap-2">
-                    <span>
-                      Decision: <strong>{{ task.taskStatus }}</strong> by {{ task.decidedByName }}
-                      @if (task.remarks) { — "{{ task.remarks }}" }
-                    </span>
-                    @if (req.status === 'APPROVED' && canIssueAward() && !hasAwardForRfq(req.recommendation.rfqId)) {
-                      <button
-                        type="button"
-                        (click)="recordAward(req.recommendation.rfqId)"
-                        [disabled]="busy()"
-                        class="h-9 px-4 rounded-lg bg-[#183b5d] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <mat-icon class="!text-base !w-4 !h-4">emoji_events</mat-icon>
-                        <span>Record Formal Award</span>
-                      </button>
-                    }
-                  </div>
-                }
               </div>
             }
           </div>
@@ -198,7 +147,7 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
           <div>
             <h2 class="text-base font-bold text-[#18283d] m-0">Awards & Controlled SAP PIR Integration</h2>
             <p class="text-xs text-[#78889b] m-0 mt-0.5">
-              Final initial-SRM integration milestone: idempotent SAP Purchase Info Record (PIR) creation/update after approval and award.
+              Idempotent SAP Purchase Info Record (PIR) tracking after approval and award issuance.
             </p>
           </div>
           <span class="px-3 py-1 rounded-full bg-[#f0f4f8] text-[#62758a] text-[10px] font-extrabold">
@@ -209,7 +158,7 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
         @if (data.sapIntegrations.length === 0) {
           <p class="text-xs text-[#6f8093] py-6 text-center">No awards recorded yet.</p>
         } @else {
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto border border-[#edf1f5] rounded-xl">
             <table class="w-full border-collapse text-left text-xs">
               <thead>
                 <tr class="bg-[#f7f9fb] text-[10px] font-extrabold uppercase tracking-wider text-[#8795a5]">
@@ -219,12 +168,13 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
                   <th class="py-2.5 px-3">Approved Value</th>
                   <th class="py-2.5 px-3">SAP PIR Status</th>
                   <th class="py-2.5 px-3">SAP PIR Reference</th>
-                  <th class="py-2.5 px-3">Action</th>
+                  <th class="py-2.5 px-3">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-[#edf1f5]">
                 @for (ev of data.sapIntegrations; track ev.integrationEventId) {
-                  <tr>
+                  @let reqId = findApprovalRequestIdForAward(ev.awardId);
+                  <tr class="hover:bg-[#f8fafc]">
                     <td class="py-3 px-3 font-bold text-[#315c80]">{{ ev.rfqNumber }}</td>
                     <td class="py-3 px-3">
                       <div class="font-bold text-[#273b51]">{{ ev.supplierName }}</div>
@@ -256,29 +206,27 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
                           <span class="px-2 py-0.5 rounded bg-[#fff1f0] text-[#a13d36] text-[10px] font-extrabold">
                             AWARD CANCELLED
                           </span>
-                        } @else {
-                          @if (ev.status !== 'SUCCESS' && canSyncSap()) {
-                            <button
-                              type="button"
-                              (click)="syncPir(ev.awardId)"
-                              [disabled]="busy()"
-                              class="h-8 px-3 rounded-lg bg-[#183b5d] text-white text-[11px] font-bold cursor-pointer"
-                            >
-                              {{ ev.status === 'FAILED' ? 'Retry SAP PIR' : 'Sync SAP PIR' }}
-                            </button>
-                          } @else if (ev.status === 'SUCCESS') {
-                            <span class="text-[11px] text-[#16834e] font-bold">Synced</span>
-                          }
-                          @if (canSyncSap()) {
-                            <button
-                              type="button"
-                              (click)="startCancelAward(ev.awardId)"
-                              [disabled]="busy()"
-                              class="h-8 px-2.5 rounded-lg border border-[#f0d4d1] bg-[#fff7f6] text-[#a13d36] text-[11px] font-bold cursor-pointer"
-                            >
-                              Cancel Award
-                            </button>
-                          }
+                        } @else if (ev.status !== 'SUCCESS' && canSyncSap()) {
+                          <button
+                            type="button"
+                            (click)="syncPir(ev.awardId, ev.rfqNumber)"
+                            [disabled]="busy()"
+                            class="h-8 px-3 rounded-lg bg-[#183b5d] text-white text-[11px] font-bold cursor-pointer inline-flex items-center gap-1"
+                          >
+                            <mat-icon class="!text-sm !w-3.5 !h-3.5">sync</mat-icon>
+                            <span>{{ ev.status === 'FAILED' ? 'Retry SAP PIR' : 'Sync SAP PIR' }}</span>
+                          </button>
+                        } @else if (ev.status === 'SUCCESS') {
+                          <span class="text-[11px] text-[#16834e] font-bold">Synced</span>
+                        }
+                        @if (reqId) {
+                          <a
+                            [routerLink]="['/approvals', reqId]"
+                            class="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-[#dce4ec] bg-white text-[#315c80] text-[11px] font-bold no-underline hover:bg-[#f4f7fa]"
+                          >
+                            <mat-icon class="!text-sm !w-3.5 !h-3.5">open_in_new</mat-icon>
+                            <span>Manage</span>
+                          </a>
                         }
                       </div>
                     </td>
@@ -287,31 +235,6 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
               </tbody>
             </table>
           </div>
-
-          @if (cancellingAwardId(); as cancelId) {
-            <div class="mt-4 p-4 rounded-xl bg-[#fff7f6] border border-[#f0d4d1] flex flex-wrap items-center gap-2">
-              <input
-                [formControl]="cancelReasonControl"
-                placeholder="Mandatory reason to cancel formal award…"
-                class="flex-1 min-w-[260px] h-9 px-3 border border-[#f0d4d1] rounded-lg bg-white text-xs"
-              />
-              <button
-                type="button"
-                (click)="confirmCancelAward(cancelId)"
-                [disabled]="busy() || !cancelReasonControl.value.trim()"
-                class="h-9 px-4 rounded-lg bg-[#a13d36] text-white text-xs font-bold cursor-pointer disabled:opacity-50"
-              >
-                Confirm Cancellation
-              </button>
-              <button
-                type="button"
-                (click)="cancellingAwardId.set(null)"
-                class="h-9 px-3 rounded-lg border border-[#dce4ec] bg-white text-xs font-bold text-[#40566d] cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          }
         }
       </section>
     }
@@ -320,16 +243,13 @@ import type { ApprovalOverview, ApprovalRequest } from '../../core/services/srm.
 export class ApprovalsComponent implements OnInit {
   private readonly srm = inject(SrmService);
   private readonly auth = inject(AuthService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly overview = signal<ApprovalOverview | null>(null);
   protected readonly loading = signal(false);
   protected readonly busy = signal(false);
   protected readonly successMessage = signal('');
   protected readonly errorMessage = signal('');
-  protected readonly cancellingAwardId = signal<string | null>(null);
-
-  protected readonly remarksControl = new FormControl('', { nonNullable: true });
-  protected readonly cancelReasonControl = new FormControl('', { nonNullable: true });
 
   ngOnInit(): void {
     if (!this.isSupplierOnly()) {
@@ -341,20 +261,8 @@ export class ApprovalsComponent implements OnInit {
     return this.auth.isSupplierOnly();
   }
 
-  protected canApprove(): boolean {
-    return this.auth.hasRole('PROCUREMENT_APPROVER');
-  }
-
-  protected canIssueAward(): boolean {
-    return this.auth.hasRole('PROCUREMENT_BUYER');
-  }
-
   protected canSyncSap(): boolean {
     return this.auth.hasRole('PROCUREMENT_BUYER', 'SRM_ADMIN');
-  }
-
-  protected isRecommenderSelf(req: ApprovalRequest): boolean {
-    return req.recommendation.recommendedBy === this.auth.getUser()?.userId;
   }
 
   protected hasAwardForRfq(rfqId: string): boolean {
@@ -363,6 +271,10 @@ export class ApprovalsComponent implements OnInit {
 
   protected isAwardCancelled(awardId: string): boolean {
     return this.overview()?.awards.some((a) => a.awardId === awardId && a.awardStatus === 'CANCELLED') ?? false;
+  }
+
+  protected findApprovalRequestIdForAward(awardId: string): string | null {
+    return this.overview()?.awards.find((a) => a.awardId === awardId)?.approvalRequestId ?? null;
   }
 
   protected loadOverview(): void {
@@ -380,42 +292,17 @@ export class ApprovalsComponent implements OnInit {
     });
   }
 
-  protected decide(requestId: string, taskId: string, decision: 'APPROVED' | 'RETURNED' | 'REJECTED'): void {
-    this.busy.set(true);
-    this.errorMessage.set('');
-    this.successMessage.set('');
-    this.srm.decideApproval(requestId, taskId, decision, this.remarksControl.value.trim()).subscribe({
-      next: (res) => {
-        this.successMessage.set(res.message);
-        this.remarksControl.setValue('');
-        this.busy.set(false);
-        this.loadOverview();
-      },
-      error: (err: HttpErrorResponse) => {
-        this.errorMessage.set(err.error?.message ?? 'Failed to record approval decision.');
-        this.busy.set(false);
-      },
+  protected async syncPir(awardId: string, rfqNumber: string): Promise<void> {
+    const ok = await this.confirmDialog.confirm({
+      title: 'Synchronize SAP PIR',
+      message: `Send idempotent SAP Purchase Info Record update for ${rfqNumber}?`,
+      confirmLabel: 'Sync SAP PIR',
+      cancelLabel: 'Cancel',
+      tone: 'primary',
+      icon: 'sync',
     });
-  }
+    if (!ok) return;
 
-  protected recordAward(rfqId: string): void {
-    this.busy.set(true);
-    this.errorMessage.set('');
-    this.successMessage.set('');
-    this.srm.recordAward(rfqId).subscribe({
-      next: (res) => {
-        this.successMessage.set(res.message);
-        this.busy.set(false);
-        this.loadOverview();
-      },
-      error: (err: HttpErrorResponse) => {
-        this.errorMessage.set(err.error?.message ?? 'Unable to record award.');
-        this.busy.set(false);
-      },
-    });
-  }
-
-  protected syncPir(awardId: string): void {
     this.busy.set(true);
     this.errorMessage.set('');
     this.successMessage.set('');
@@ -429,32 +316,6 @@ export class ApprovalsComponent implements OnInit {
         this.errorMessage.set(err.error?.message ?? 'SAP PIR sync failed.');
         this.busy.set(false);
         this.loadOverview();
-      },
-    });
-  }
-
-  protected startCancelAward(awardId: string): void {
-    this.cancellingAwardId.set(awardId);
-    this.cancelReasonControl.setValue('');
-  }
-
-  protected confirmCancelAward(awardId: string): void {
-    const reason = this.cancelReasonControl.value.trim();
-    if (!reason || this.busy()) return;
-    this.busy.set(true);
-    this.errorMessage.set('');
-    this.successMessage.set('');
-    this.srm.cancelAward(awardId, reason).subscribe({
-      next: (res) => {
-        this.successMessage.set(res.message);
-        this.cancellingAwardId.set(null);
-        this.cancelReasonControl.setValue('');
-        this.busy.set(false);
-        this.loadOverview();
-      },
-      error: (err: HttpErrorResponse) => {
-        this.errorMessage.set(err.error?.message ?? 'Unable to cancel award.');
-        this.busy.set(false);
       },
     });
   }
